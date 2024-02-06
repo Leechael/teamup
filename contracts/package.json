@@ -1,0 +1,16 @@
+{
+  "name": "contracts",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@phala/solidity": "^0.0.4",
+    "@viem/anvil": "^0.0.7",
+    "solmate": "^6.2.0",
+    "viem": "^1.20.1",
+    "vitest": "^1.0.4"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
