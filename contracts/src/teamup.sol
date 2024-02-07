@@ -3,10 +3,11 @@ pragma solidity >=0.8.21;
 
 import {ERC1155} from 'solmate/src/tokens/ERC1155.sol';
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./libraries/UnsafeMath.sol";
 
-contract RandomRedEnvelope is ERC1155, AccessControl {
+contract Teamup is ERC1155, Ownable, AccessControl {
   using Strings for uint256;
 
   //
@@ -34,7 +35,10 @@ contract RandomRedEnvelope is ERC1155, AccessControl {
 
   mapping(uint256 => Team) public teams;
 
-  bool public hasEnded = false;
+  mapping(address => uint256) public leaderOf;
+  mapping(uint256 => mapping(address => bool)) public membersOf;
+
+  bool public hasDrawn = false;
 
   uint256 public prizePool;
 
@@ -45,31 +49,42 @@ contract RandomRedEnvelope is ERC1155, AccessControl {
   event Created(uint256 indexed teamId, address indexed creator, uint256 points);
   event Joined(uint256 indexed teamId, address indexed member, uint256 points);
   event Scored(uint256 indexed teamId, address indexed member, uint256 points);
-  event Ended(uint256 indexed winnerTeamId, uint256 prizePool, uint256 tokenPerPoint);
-  event Donated(address indexed from, uint256 value);
+  event Drawn(uint256 indexed winnerTeamId, uint256 prizePool, uint256 tokenPerPoint);
+  event Contributed(address indexed from, uint256 value);
 
   //
   // Functions
   //
 
+  constructor() {
+    _transferOwnership(msg.sender);
+    _grantRole(ROLE_ATTESTOR, msg.sender);
+  }
+
+  function setAttestor(address target) external onlyOwner {
+    _grantRole(ROLE_ATTESTOR, target);
+  }
+
   ///
   /// Donate is use for deposit prize pool.
   ///
-  function donate() external payable {
-    require(msg.value > 0.005 ether, "The minimal value for donate is 0.005 ether.");
-    require(hasEnded == false, "The game has ended.");
+  function contribute() external payable {
+    require(msg.value > 0.005 ether, "The minimal value for contribute is 0.005 ether.");
+    require(hasDrawn == false, "The game has ended.");
 
     prizePool += msg.value;
 
-    emit Donated(msg.sender, msg.value);
+    emit Contributed(msg.sender, msg.value);
   }
 
   function createTeam(address leader) external {
     require(hasRole(ROLE_ATTESTOR, msg.sender), "Only attestor can call createTeam");
-    require(hasEnded == false, "The game has ended.");
+    require(leaderOf[leader] == 0, "The leader already created a team.");
+    require(hasDrawn == false, "The game has ended.");
 
     uint256 _id = nextTeamId++;
     teams[_id] = Team(_id, leader, 1 ether);
+    leaderOf[leader] = _id;
 
     emit Created(_id, leader, 1 ether);
 
@@ -79,20 +94,28 @@ contract RandomRedEnvelope is ERC1155, AccessControl {
   function joinTeam(uint256 teamId, address member) external {
     require(hasRole(ROLE_ATTESTOR, msg.sender), "Only attestor can call joinTeam.");
     require(teamId < nextTeamId, "Team not exists.");
-    require(hasEnded == false, "The game has ended.");
+    require(leaderOf[member] != teamId, "You can not join your own team.");
+    require(membersOf[teamId][member] == false, "You already joined the team.");
+    require(hasDrawn == false, "The game has ended.");
 
     teams[teamId].points += 1 ether;
+    membersOf[teamId][member] = true;
 
     emit Joined(teamId, member, 1 ether);
 
     _mint(member, teamId, 1 ether, '');
   }
 
+  function isMemberOf(uint256 teamId) external view returns (bool) {
+    return membersOf[teamId][msg.sender];
+  }
+
   function score(uint256 teamId, address member, uint256 points) external {
     require(hasRole(ROLE_ATTESTOR, msg.sender), "Only attestor can call earnPoints.");
     require(teamId < nextTeamId, "Team not exists.");
+    require(leaderOf[member] == teamId || membersOf[teamId][member] == true, "You should be leader or member of the team.");
     require(points > 0.05 ether, "The minimal points for earnPoints is 0.05 ether.");
-    require(hasEnded == false, "The game has ended.");
+    require(hasDrawn == false, "The game has ended.");
 
     teams[teamId].points += points;
 
@@ -101,11 +124,11 @@ contract RandomRedEnvelope is ERC1155, AccessControl {
     _mint(member, teamId, points, '');
   }
 
-  function end(uint256 winnerId, address[] calldata addresses) external {
-    require(hasRole(ROLE_ATTESTOR, msg.sender), "Only attestor can call end.");
-    require(hasEnded == false, "The game has ended.");
+  function draw(uint256 winnerId, address[] calldata addresses) external {
+    require(hasRole(ROLE_ATTESTOR, msg.sender), "Only attestor can call draw.");
+    require(hasDrawn == false, "The game has drawn.");
 
-    hasEnded = true;
+    hasDrawn = true;
 
     uint256 tokenPerPoint = UnsafeMath.divRoundingDown(prizePool, teams[winnerId].points);
     unchecked {
@@ -113,12 +136,15 @@ contract RandomRedEnvelope is ERC1155, AccessControl {
         uint256 points = balanceOf[addresses[i]][winnerId];
         uint256 value = points * tokenPerPoint;
         (bool sentPayment, ) = payable(addresses[i]).call{value: value}("");
+        if (sentPayment) {
+          prizePool -= value;
+        }
         // NOTE: if we emit error when pay fail, it will a potential bugs here.
-        // require(sentPayment, "Send payment failed.");
+        require(sentPayment, "Send payment failed.");
       }
     }
 
-    emit Ended(winnerId, prizePool, tokenPerPoint);
+    emit Drawn(winnerId, prizePool, tokenPerPoint);
   }
 
   //

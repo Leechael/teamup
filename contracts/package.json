@@ -2,6 +2,10 @@
   "name": "contracts",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "build": "forge build",
+    "test": "forge build --offline && vitest run"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@phala/solidity": "^0.0.4",
