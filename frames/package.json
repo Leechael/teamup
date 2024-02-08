@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "dev": "bun run --hot src/index.ts"
+  },
+  "dependencies": {
+    "frames.js": "^0.4.0",
+    "hono": "^3.12.8",
+    "ramda": "^0.29.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/ramda": "^0.29.10"
+  }
+}
