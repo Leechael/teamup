@@ -31,10 +31,16 @@ app.get('/campaigns/:chain/:contract/:teamId', async (c) => {
     ],
     postUrl: `${proto}://${host}/frames/${c.req.param('chain')}/${c.req.param('contract')}/${c.req.param('teamId')}`,
   }
-  const meta = R.filter((i) => !!(i?.[1]), R.toPairs(getFrameFlattened(frame))) as [string, string][]
+  const frameSpec = R.filter((i) => !!(i?.[1]), R.toPairs(getFrameFlattened(frame))) as [string, string][]
+  const meta = [
+    ['og:title', 'Campaign'],
+    ['og:image', `${proto}://${host}/public/cover/${c.req.param('contract')}.jpg`],
+    ...frameSpec,
+  ]
   return c.html(
     <html>
       <head>
+        <title>Hello Frames</title>
         {meta.map(([key, value]) => <meta name={key} content={value} />)}
       </head>
       <body>
@@ -60,10 +66,16 @@ app.post('/frames/:chain/:contract/:teamId', async (c) => {
     ],
     postUrl: `${proto}://${host}/frames/${c.req.param('chain')}/${c.req.param('contract')}/${c.req.param('teamId')}`,
   }
-  const meta = R.filter((i) => !!(i?.[1]), R.toPairs(getFrameFlattened(frame))) as [string, string][]
+  const frameSpec = R.filter((i) => !!(i?.[1]), R.toPairs(getFrameFlattened(frame))) as [string, string][]
+  const meta = [
+    ['og:title', 'Campaign'],
+    ['og:image', `${proto}://${host}/public/cover/${c.req.param('contract')}.jpg`],
+    ...frameSpec,
+  ]
   return c.html(
     <html>
       <head>
+        <title>Hello Frames</title>
         {meta.map(([key, value]) => <meta name={key} content={value} />)}
       </head>
       <body>
